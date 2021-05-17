@@ -86,6 +86,8 @@ def end_of_chunk(prev_tag, tag, prev_type, type_):
 def evaluate_fn(guessed, correct, last_correct, last_correct_type, last_guessed, last_guessed_type, in_correct, counts):
     guessed, guessed_type = parse_tag(guessed)
     correct, correct_type = parse_tag(correct)
+    print("evaluate_fn-89: ", guessed,guessed_type)
+    print("evaluate_fn-90: ",correct, correct_type)
 
     end_correct = end_of_chunk(last_correct, correct,
                                last_correct_type, correct_type)
@@ -181,7 +183,8 @@ def metrics(counts):
 def conll_evaluation(hyps_list, labels_list):
     counts = evaluate(hyps_list, labels_list)
     overall, by_type = metrics(counts)
-
+    print('overall: ', overall);
+    print('by_type: ', by_type);
     c = counts
     acc = c.correct_tags / c.token_counter
     pre = overall.prec
@@ -196,8 +199,13 @@ def conll_evaluation(hyps_list, labels_list):
         type_macro_rec += by_type[k].rec
         type_macro_f1 += by_type[k].fscore
         
-    type_macro_pre = type_macro_pre / float(len(by_type))
-    type_macro_rec = type_macro_rec / float(len(by_type))
-    type_macro_f1 = type_macro_f1 / float(len(by_type))
+    if len(by_type) == 0:
+        type_macro_pre = 0
+        type_macro_rec = 0
+        type_macro_f1 = 0
+    else:
+        type_macro_pre = type_macro_pre / float(len(by_type))
+        type_macro_rec = type_macro_rec / float(len(by_type))
+        type_macro_f1 = type_macro_f1 / float(len(by_type))
     
     return (acc, pre, rec, f1, type_macro_pre, type_macro_rec, type_macro_f1)

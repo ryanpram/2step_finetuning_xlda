@@ -10,6 +10,9 @@ from torch.optim.lr_scheduler import StepLR
 from tqdm import tqdm
 from transformers import AdamW
 from nltk.tokenize import TweetTokenizer
+import matplotlib.pyplot as plt
+
+
 
 from utils.functions import load_model, WordSplitTokenizer
 from utils.args_helper import get_parser, print_opts, append_dataset_args
@@ -44,7 +47,8 @@ def evaluate(model, data_loader, forward_fn, metrics_fn, i2w, is_test=False):
 
     list_hyp, list_label, list_seq = [], [], []
 
-    pbar = tqdm(iter(data_loader), leave=True, total=len(data_loader))
+    pbar = tqdm(iter(data_loader), leave=True, total=len(data_loader))  
+    print('test loader len: ',len(data_loader))
     for i, batch_data in enumerate(pbar):
         batch_seq = batch_data[-1]        
         loss, batch_hyp, batch_label = forward_fn(model, batch_data[:-1], i2w=i2w, device=args['device'])
@@ -53,6 +57,7 @@ def evaluate(model, data_loader, forward_fn, metrics_fn, i2w, is_test=False):
         # Calculate total loss
         test_loss = loss.item()
         total_loss = total_loss + test_loss
+        print('test loss: ',test_loss)
 
         # Calculate evaluation metrics
         list_hyp += batch_hyp
@@ -65,10 +70,11 @@ def evaluate(model, data_loader, forward_fn, metrics_fn, i2w, is_test=False):
         else:
             pbar.set_description("TEST LOSS:{:.4f} {}".format(total_loss/(i+1), metrics_to_string(metrics)))
     
+    final_eval_loss = total_loss/(i+1)
     if is_test:
         return total_loss, metrics, list_hyp, list_label, list_seq
     else:
-        return total_loss, metrics
+        return total_loss, metrics, final_eval_loss
 
 # Training function and trainer
 def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, valid_criterion, i2w, n_epochs, evaluate_every=1, early_stop=3, step_size=1, gamma=0.5, model_dir="", exp_id=None):
@@ -76,6 +82,8 @@ def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, 
 
     best_val_metric = -100
     count_stop = 0
+    val_loss_history = []
+    train_loss_history = []
 
     for epoch in range(n_epochs):
         model.train()
@@ -110,12 +118,19 @@ def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, 
         print("(Epoch {}) TRAIN LOSS:{:.4f} {} LR:{:.8f}".format((epoch+1),
             total_train_loss/(i+1), metrics_to_string(metrics), get_lr(args, optimizer)))
         
+        #for train loss visualitation
+        epoch_train_loss = total_train_loss/(i+1)
+        train_loss_history.append(epoch_train_loss)
+
         # Decay Learning Rate
         scheduler.step()
 
         # evaluate
         if ((epoch+1) % evaluate_every) == 0:
-            val_loss, val_metrics = evaluate(model, valid_loader, forward_fn, metrics_fn, i2w, is_test=False)
+            val_loss, val_metrics, final_eval_loss = evaluate(model, valid_loader, forward_fn, metrics_fn, i2w, is_test=False)
+
+            #for val loss visualitation
+            val_loss_history.append(final_eval_loss)
 
             # Early stopping
             val_metric = val_metrics[valid_criterion]
@@ -132,6 +147,15 @@ def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, 
                 print("count stop:", count_stop)
                 if count_stop == early_stop:
                     break
+    
+    plt.plot(train_loss_history)
+    plt.plot(val_loss_history)
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train loss', 'val loss'], loc='upper left')
+    plt.savefig(model_dir + "/visualization/" + 'train_val_loss.png')
+    plt.show()
 
 if __name__ == "__main__":
     # Make sure cuda is deterministic
@@ -149,6 +173,15 @@ if __name__ == "__main__":
         print(f'overwriting model directory `{model_dir}`')
     else:
         raise Exception(f'model directory `{model_dir}` already exists, use --force if you want to overwrite the folder')
+
+    visualization_dir = '{}/{}'.format(model_dir,'visualization')
+    if not os.path.exists(visualization_dir):
+        os.makedirs(visualization_dir, exist_ok=True)
+    elif args['force']:
+        print(f'overwriting model directory `{visualization_dir}`')
+    else:
+        raise Exception(f'visualizatation directory `{visualization_dir}` already exists, use --force if you want to overwrite the folder')
+
 
     # Set random seed
     set_seed(args['seed'])  # Added here for reproductibility    
@@ -181,6 +214,7 @@ if __name__ == "__main__":
     test_dataset = args['dataset_class'](test_dataset_path, tokenizer, lowercase=args["lower"], no_special_token=args['no_special_token'])
     test_loader = args['dataloader_class'](dataset=test_dataset, max_seq_len=args['max_seq_len'], batch_size=args['valid_batch_size'], num_workers=16, shuffle=False)
 
+    
     # Train
     train(model, train_loader=train_loader, valid_loader=valid_loader, optimizer=optimizer, forward_fn=args['forward_fn'], metrics_fn=args['metrics_fn'], valid_criterion=args['valid_criterion'], i2w=i2w, n_epochs=args['n_epochs'], evaluate_every=1, early_stop=args['early_stop'], step_size=args['step_size'], gamma=args['gamma'], model_dir=model_dir, exp_id=0)
 
@@ -196,6 +230,8 @@ if __name__ == "__main__":
     # Evaluate
     print("=========== EVALUATION PHASE ===========")
     test_loss, test_metrics, test_hyp, test_label, test_seq = evaluate(model, data_loader=test_loader, forward_fn=args['forward_fn'], metrics_fn=args['metrics_fn'], i2w=i2w, is_test=True)
+
+    print("test lost: ",test_loss)
 
     metrics_scores.append(test_metrics)
     result_dfs.append(pd.DataFrame({

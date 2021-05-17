@@ -236,6 +236,7 @@ def append_dataset_args(args):
         args['train_set_path'] = './dataset/facqa_qa-factoid-itb/train_preprocess.csv'
         args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
         args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+        # args['test_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
         args['vocab_path'] = "./dataset/facqa_qa-factoid-itb/vocab_uncased.txt"
         args['embedding_path'] = {
             'fasttext-cc-id-300-no-oov-uncased': './embeddings/fasttext-cc-id/cc.id.300_no-oov_qa-factoid-itb_uncased.txt',
