@@ -41,9 +41,12 @@ def metrics_to_string(metric_dict):
 ###
 
 # Evaluate function for validation and test
-def evaluate(model, data_loader, forward_fn, metrics_fn, i2w, is_test=False):
+def evaluate(model, data_loader, forward_fn, metrics_fn, i2w, is_test=False, epoch=0):
     model.eval()
     total_loss, total_correct, total_labels = 0, 0, 0
+    eval_global_step = 0
+    eval_step_loss_histories = []
+    steps = []
 
     list_hyp, list_label, list_seq = [], [], []
 
@@ -69,6 +72,16 @@ def evaluate(model, data_loader, forward_fn, metrics_fn, i2w, is_test=False):
             pbar.set_description("VALID LOSS:{:.4f} {}".format(total_loss/(i+1), metrics_to_string(metrics)))
         else:
             pbar.set_description("TEST LOSS:{:.4f} {}".format(total_loss/(i+1), metrics_to_string(metrics)))
+
+        eval_global_step+=1
+        #save history metrics per save_steps
+        #for train loss visualitation
+        if eval_global_step % args["save_eval_history_steps"] == 0 :
+            print('save eval loss history at global step: ', eval_global_step)
+            step_eval_loss = total_loss/(i+1)
+            eval_step_loss_histories.append(step_eval_loss)
+            steps.append(eval_global_step)
+
     
     final_eval_loss = total_loss/(i+1)
     if is_test:
@@ -84,6 +97,11 @@ def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, 
     count_stop = 0
     val_loss_history = []
     train_loss_history = []
+    step_train_loss_history = []
+    step_val_loss_history = []
+    global_step = 0
+    train_history_steps = []
+    val_history_steps = []
 
     for epoch in range(n_epochs):
         model.train()
@@ -113,12 +131,23 @@ def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, 
             
             train_pbar.set_description("(Epoch {}) TRAIN LOSS:{:.4f} LR:{:.8f}".format((epoch+1),
                 total_train_loss/(i+1), get_lr(args, optimizer)))
+
+            global_step += 1
+
+            #save history metrics per save_steps
+            #for train loss visualitation
+            if global_step % args["save_history_steps"] == 0 :
+                print('save training loss history at global step: ', global_step)
+                step_train_loss = total_train_loss/(i+1)
+                step_train_loss_history.append(step_train_loss)
+                train_history_steps.append(global_step)
+
                         
         metrics = metrics_fn(list_hyp, list_label)
         print("(Epoch {}) TRAIN LOSS:{:.4f} {} LR:{:.8f}".format((epoch+1),
             total_train_loss/(i+1), metrics_to_string(metrics), get_lr(args, optimizer)))
         
-        #for train loss visualitation
+        #save history metrics per epoch
         epoch_train_loss = total_train_loss/(i+1)
         train_loss_history.append(epoch_train_loss)
 
@@ -127,10 +156,12 @@ def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, 
 
         # evaluate
         if ((epoch+1) % evaluate_every) == 0:
-            val_loss, val_metrics, final_eval_loss = evaluate(model, valid_loader, forward_fn, metrics_fn, i2w, is_test=False)
+            val_loss, val_metrics,  eval_loss_per_epoch = evaluate(model, valid_loader, forward_fn, metrics_fn, i2w, is_test=False)
 
             #for val loss visualitation
-            val_loss_history.append(final_eval_loss)
+            # step_val_loss_history += eval_step_loss_histories
+            # val_history_steps += val_steps
+            val_loss_history.append(eval_loss_per_epoch)
 
             # Early stopping
             val_metric = val_metrics[valid_criterion]
@@ -148,6 +179,7 @@ def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, 
                 if count_stop == early_stop:
                     break
     
+    #training/validation per step
     plt.plot(train_loss_history)
     plt.plot(val_loss_history)
     plt.title('model loss')
@@ -156,6 +188,31 @@ def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, 
     plt.legend(['train loss', 'val loss'], loc='upper left')
     plt.savefig(model_dir + "/visualization/" + 'train_val_loss.png')
     plt.show()
+    plt.clf()
+    plt.cla()
+    plt.close()
+
+    #training plot per step
+    plt.plot(train_history_steps,step_train_loss_history)
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('step')
+    plt.legend(['train loss'], loc='upper left')
+    plt.savefig(model_dir + "/visualization/" + 'train_per_step_loss.png')
+    plt.show()
+    plt.clf()
+    plt.cla()
+    plt.close()
+
+    #validation plot per step
+    # plt.plot(val_history_steps,step_val_loss_history)
+    # plt.title('model loss')
+    # plt.ylabel('loss')
+    # plt.xlabel('step')
+    # plt.legend(['train loss', 'val loss'], loc='upper left')
+    # plt.savefig(model_dir + "/visualization/" + 'val_per_step_loss.png')
+    # plt.show()
+    
 
 if __name__ == "__main__":
     # Make sure cuda is deterministic

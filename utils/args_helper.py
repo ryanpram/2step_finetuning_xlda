@@ -54,6 +54,8 @@ def get_parser():
     parser.add_argument("--force", action='store_true', help="force to rewrite experiment folder")
     parser.add_argument("--no_special_token", action='store_true', help="not adding special token as the input")
     parser.add_argument("--lower", action='store_true', help="lower case")
+    parser.add_argument('--save_history_steps', type=int, default=50, help="Save Training history every X updates steps.")
+    parser.add_argument('--save_eval_history_steps', type=int, default=50, help="Save Eval history every X updates steps.")
 
     args = vars(parser.parse_args())
     print_opts(args)
