@@ -7,11 +7,13 @@ from utils.data_utils import DocumentSentimentDataset, DocumentSentimentDataLoad
 from utils.data_utils import KeywordExtractionDataset, KeywordExtractionDataLoader
 from utils.data_utils import NewsCategorizationDataset, NewsCategorizationDataLoader
 from utils.data_utils import QAFactoidDataset, QAFactoidDataLoader
+#from utils.data_utils import SquadLikeDataset
 from utils.data_utils import AspectBasedSentimentAnalysisAiryDataset, AspectBasedSentimentAnalysisProsaDataset, AspectBasedSentimentAnalysisDataLoader
 
 from utils.functions import WordSplitTokenizer
 from utils.metrics import emotion_detection_metrics_fn, aspect_extraction_metrics_fn, ner_metrics_fn, pos_tag_metrics_fn, entailment_metrics_fn, document_sentiment_metrics_fn, keyword_extraction_metrics_fn, news_categorization_metrics_fn, qa_factoid_metrics_fn, absa_metrics_fn
 from utils.forward_fn import forward_sequence_classification, forward_word_classification, forward_sequence_multi_classification
+from torch.utils.data import TensorDataset, DataLoader
 
 from nltk.tokenize import TweetTokenizer
 from argparse import ArgumentParser
@@ -52,10 +54,14 @@ def get_parser():
     parser.add_argument("--gamma", type=float, default=0.5, help="Gamma")
     parser.add_argument("--debug", action='store_true', help="debugging mode")
     parser.add_argument("--force", action='store_true', help="force to rewrite experiment folder")
+    parser.add_argument("--eval_only", action='store_true', help="for skipping training process")
     parser.add_argument("--no_special_token", action='store_true', help="not adding special token as the input")
     parser.add_argument("--lower", action='store_true', help="lower case")
     parser.add_argument('--save_history_steps', type=int, default=50, help="Save Training history every X updates steps.")
     parser.add_argument('--save_eval_history_steps', type=int, default=50, help="Save Eval history every X updates steps.")
+    parser.add_argument('--dropout_prob', type=float, default=0.1, help="Dropout Probability value.")
+    parser.add_argument('--data_type', type=str, default='original', help="For determine dataset.")
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=1, help="Number of updates steps to accumulate before performing a backward/update pass.")
 
     args = vars(parser.parse_args())
     print_opts(args)
@@ -235,9 +241,75 @@ def append_dataset_args(args):
         args['forward_fn'] = forward_word_classification
         args['metrics_fn'] = qa_factoid_metrics_fn
         args['valid_criterion'] = 'F1'
-        args['train_set_path'] = './dataset/facqa_qa-factoid-itb/train_preprocess.csv'
-        args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
-        args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+
+        if args['data_type'] == 'combined':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/combined_train_data.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+        elif args['data_type'] == 'english-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_preprocess.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+        elif args['data_type'] == 'original':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/train_preprocess.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+        elif args['data_type'] == 'chinese-only':
+            args['train_set_path'] = './dataset/crmc/train_preprocessed.csv'
+            args['valid_set_path'] = './dataset/crmc/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/crmc/test_preprocessed.csv'
+        elif args['data_type'] == 'chinese-combined':
+            args['train_set_path'] = './dataset/crmc/combined_zh_preprocessed.csv'
+            args['valid_set_path'] = './dataset/crmc/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/crmc/test_preprocessed.csv'
+        elif args['data_type'] == 'chinese-english-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_preprocess.csv'
+            args['valid_set_path'] = './dataset/crmc/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/crmc/test_preprocessed.csv'
+        elif args['data_type'] == 'france-only':
+            args['train_set_path'] = './dataset/fquad/train_preprocessed.csv'
+            args['valid_set_path'] = './dataset/fquad/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/fquad/test_preprocessed.csv'
+        elif args['data_type'] == 'france-combined':
+            args['train_set_path'] = './dataset/fquad/combined_fr_preprocessed.csv'
+            args['valid_set_path'] = './dataset/fquad/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/fquad/test_preprocessed.csv'
+        elif args['data_type'] == 'france-english-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_preprocess.csv'
+            args['valid_set_path'] = './dataset/fquad/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/fquad/test_preprocessed.csv'
+        elif args['data_type'] == 'viet-only':
+            args['train_set_path'] = './dataset/ViQuAD/train_preprocessed.csv'
+            args['valid_set_path'] = './dataset/ViQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/ViQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'viet-combined':
+            args['train_set_path'] = './dataset/ViQuAD/combined_vi_preprocessed.csv'
+            args['valid_set_path'] = './dataset/ViQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/ViQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'viet-english-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_preprocess.csv'
+            args['valid_set_path'] = './dataset/ViQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/ViQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'viet-broken':
+            args['train_set_path'] = './dataset/ViQuAD/train_sample_preprocessed.csv'
+            args['valid_set_path'] = './dataset/ViQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/ViQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'korean-only':
+            args['train_set_path'] = './dataset/KorQuAD/train_preprocessed.csv'
+            args['valid_set_path'] = './dataset/KorQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/KorQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'korean-combined':
+            args['train_set_path'] = './dataset/KorQuAD/combined_full_ver_kor_preprocessed.csv'
+            args['valid_set_path'] = './dataset/KorQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/KorQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'korean-english-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_unfiltered_preprocess.csv'
+            args['valid_set_path'] = './dataset/KorQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/KorQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'test-indo':
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+
+
         # args['test_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
         args['vocab_path'] = "./dataset/facqa_qa-factoid-itb/vocab_uncased.txt"
         args['embedding_path'] = {
@@ -246,6 +318,89 @@ def append_dataset_args(args):
         }
         args['k_fold'] = 1
         args['word_tokenizer_class'] = TweetTokenizer
+    elif args['dataset'] == "squad-like-dataset":
+        args['task'] = 'question_answering'
+        #args['dataset_class'] = SquadLikeDataset
+        args['dataloader_class'] = QAFactoidDataLoader
+        args['forward_fn'] = forward_word_classification
+        args['metrics_fn'] = qa_factoid_metrics_fn
+        args['valid_criterion'] = 'F1'
+
+        if args['data_type'] == 'combined':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/combined_train_data.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+        elif args['data_type'] == 'english-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_preprocess.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+        elif args['data_type'] == 'original':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/train_preprocess.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+        elif args['data_type'] == 'chinese-only':
+            args['train_set_path'] = './dataset/crmc/train_preprocessed.csv'
+            args['valid_set_path'] = './dataset/crmc/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/crmc/test_preprocessed.csv'
+        elif args['data_type'] == 'chinese-combined':
+            args['train_set_path'] = './dataset/crmc/combined_zh_preprocessed.csv'
+            args['valid_set_path'] = './dataset/crmc/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/crmc/test_preprocessed.csv'
+        elif args['data_type'] == 'chinese-english-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_preprocess.csv'
+            args['valid_set_path'] = './dataset/crmc/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/crmc/test_preprocessed.csv'
+        elif args['data_type'] == 'france-only':
+            args['train_set_path'] = './dataset/fquad/train_preprocessed.csv'
+            args['valid_set_path'] = './dataset/fquad/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/fquad/test_preprocessed.csv'
+        elif args['data_type'] == 'france-combined':
+            args['train_set_path'] = './dataset/fquad/combined_fr_preprocessed.csv'
+            args['valid_set_path'] = './dataset/fquad/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/fquad/test_preprocessed.csv'
+        elif args['data_type'] == 'france-english-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_preprocess.csv'
+            args['valid_set_path'] = './dataset/fquad/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/fquad/test_preprocessed.csv'
+        elif args['data_type'] == 'viet-only':
+            args['train_set_path'] = './dataset/ViQuAD/train_preprocessed.csv'
+            args['valid_set_path'] = './dataset/ViQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/ViQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'viet-combined':
+            args['train_set_path'] = './dataset/ViQuAD/combined_vi_preprocessed.csv'
+            args['valid_set_path'] = './dataset/ViQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/ViQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'viet-english-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_preprocess.csv'
+            args['valid_set_path'] = './dataset/ViQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/ViQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'viet-broken':
+            args['train_set_path'] = './dataset/ViQuAD/train_sample_preprocessed.csv'
+            args['valid_set_path'] = './dataset/ViQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/ViQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'korean-only':
+            args['train_set_path'] = './dataset/KorQuAD/train_preprocessed.csv'
+            args['valid_set_path'] = './dataset/KorQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/KorQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'korean-combined':
+            args['train_set_path'] = './dataset/KorQuAD/combined_full_ver_kor_preprocessed.csv'
+            args['valid_set_path'] = './dataset/KorQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/KorQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'korean-english-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_unfiltered_preprocess.csv'
+            args['valid_set_path'] = './dataset/KorQuAD/valid_preprocessed.csv'
+            args['test_set_path'] = './dataset/KorQuAD/test_preprocessed.csv'
+
+
+        # args['test_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+        args['vocab_path'] = "./dataset/facqa_qa-factoid-itb/vocab_uncased.txt"
+        args['embedding_path'] = {
+            'fasttext-cc-id-300-no-oov-uncased': './embeddings/fasttext-cc-id/cc.id.300_no-oov_qa-factoid-itb_uncased.txt',
+            'fasttext-4B-id-300-no-oov-uncased': './embeddings/fasttext-4B-id-uncased/fasttext.4B.id.300.epoch5_uncased_no-oov_qa-factoid-itb_uncased.txt'
+        }
+        args['k_fold'] = 1
+        args['word_tokenizer_class'] = TweetTokenizer
+    
     elif args['dataset'] == "ner-prosa":
         args['task'] = 'token_classification'
         args['num_labels'] = NerProsaDataset.NUM_LABELS
@@ -302,4 +457,6 @@ def append_dataset_args(args):
         args['word_tokenizer_class'] = TweetTokenizer
     else:
         raise ValueError(f'Unknown dataset name `{args["dataset"]}`')
+
+    print(args)
     return args

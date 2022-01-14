@@ -13,6 +13,8 @@ from transformers.modeling_utils import PreTrainedModel, prune_linear_layer
 from transformers.modeling_xlm import XLMPreTrainedModel
 from transformers import AlbertPreTrainedModel, BertPreTrainedModel, AlbertModel, BertModel, BertConfig, XLMModel, XLMConfig, XLMRobertaModel, XLMRobertaConfig
 from transformers import AutoTokenizer, AutoConfig
+# from utils.args_helper import get_parser, print_opts, append_dataset_args
+
 
 XLM_ROBERTA_PRETRAINED_MODEL_ARCHIVE_MAP = {
     "xlm-roberta-base": "https://s3.amazonaws.com/models.huggingface.co/bert/xlm-roberta-base-pytorch_model.bin",
@@ -41,8 +43,12 @@ class BertForWordClassification(BertPreTrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
 
+        dropout_prob = 0.5
+
         self.bert = BertModel(config)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        # self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        print('dropout prob: ', dropout_prob)
+        self.dropout = nn.Dropout(dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
         self.init_weights()
@@ -90,6 +96,8 @@ class BertForWordClassification(BertPreTrainedModel):
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
         )
+
+        
 
         sequence_output = outputs[0]
 
