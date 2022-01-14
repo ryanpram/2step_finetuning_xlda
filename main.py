@@ -51,7 +51,6 @@ def evaluate(model, data_loader, forward_fn, metrics_fn, i2w, is_test=False, epo
     list_hyp, list_label, list_seq = [], [], []
 
     pbar = tqdm(iter(data_loader), leave=True, total=len(data_loader))  
-    print('test loader len: ',len(data_loader))
     for i, batch_data in enumerate(pbar):
         batch_seq = batch_data[-1]        
         loss, batch_hyp, batch_label = forward_fn(model, batch_data[:-1], i2w=i2w, device=args['device'])
@@ -60,7 +59,6 @@ def evaluate(model, data_loader, forward_fn, metrics_fn, i2w, is_test=False, epo
         # Calculate total loss
         test_loss = loss.item()
         total_loss = total_loss + test_loss
-        print('test loss: ',test_loss)
 
         # Calculate evaluation metrics
         list_hyp += batch_hyp
@@ -77,7 +75,6 @@ def evaluate(model, data_loader, forward_fn, metrics_fn, i2w, is_test=False, epo
         #save history metrics per save_steps
         #for train loss visualitation
         if eval_global_step % args["save_eval_history_steps"] == 0 :
-            print('save eval loss history at global step: ', eval_global_step)
             step_eval_loss = total_loss/(i+1)
             eval_step_loss_histories.append(step_eval_loss)
             steps.append(eval_global_step)
@@ -89,8 +86,38 @@ def evaluate(model, data_loader, forward_fn, metrics_fn, i2w, is_test=False, epo
     else:
         return total_loss, metrics, final_eval_loss
 
+def passage_token_len(subword_to_word_indices,batch_idx) :
+    # print('Batch index: ', batch_idx)
+    for subword_to_word_indice in subword_to_word_indices:
+        # print(word_idx_batch.shape)
+        list_tokens = subword_to_word_indice.tolist()
+        ctr = 0
+        for token in list_tokens:
+            if token != -1:
+                ctr+=1
+        # print('len passage: ',ctr)
+
+def save_best_pretrained_model(model,tokenizer,output_dir) :
+    model_used = 'xlm-roberta' #hardcoded
+    saved_pretained_dir =  output_dir + '/' + model_used + '-pretrained/';
+
+    if not os.path.exists(saved_pretained_dir):
+            os.makedirs(saved_pretained_dir)
+
+    # Save a trained model, configuration and tokenizer using `save_pretrained()`.
+    # They can then be reloaded using `from_pretrained()`
+    model_to_save = model.module if hasattr(model, 'module') else model  # Take care of distributed/parallel training
+    model_to_save.save_pretrained(saved_pretained_dir)
+    tokenizer.save_pretrained(saved_pretained_dir)
+
+    # Good practice: save your training arguments together with the trained model
+    torch.save(args, os.path.join(saved_pretained_dir, 'training_args.bin'))
+
+    return True
+
+
 # Training function and trainer
-def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, valid_criterion, i2w, n_epochs, evaluate_every=1, early_stop=3, step_size=1, gamma=0.5, model_dir="", exp_id=None):
+def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, valid_criterion, i2w, n_epochs, evaluate_every=1, early_stop=3, step_size=1, gamma=0.5, model_dir="", exp_id=None,tokenizer=None):
     scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
 
     best_val_metric = -100
@@ -102,45 +129,64 @@ def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, 
     global_step = 0
     train_history_steps = []
     val_history_steps = []
+    
+    accumulation_steps = args['gradient_accumulation_steps']
 
     for epoch in range(n_epochs):
         model.train()
         total_train_loss = 0
+        tr_loss = 0
         list_hyp, list_label = [], []
         
         train_pbar = tqdm(iter(train_loader), leave=True, total=len(train_loader))
+        torch.autograd.set_detect_anomaly(True)
         for i, batch_data in enumerate(train_pbar):
+            #check batch_data token passage len
+            # passage_token_len(batch_data[3],i)
+            # with torch.autograd.detect_anomaly():
             loss, batch_hyp, batch_label = forward_fn(model, batch_data[:-1], i2w=i2w, device=args['device'])
 
-            optimizer.zero_grad()
+            # normalize loss to account for batch accumulation
+            loss = loss / accumulation_steps
+            
             if args['fp16']:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
-                torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), args['max_norm'])
             else:
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), args['max_norm'])
-            optimizer.step()
-
-            tr_loss = loss.item()
-            total_train_loss = total_train_loss + tr_loss
-
-            # Calculate metrics
-            list_hyp += batch_hyp
-            list_label += batch_label
             
-            train_pbar.set_description("(Epoch {}) TRAIN LOSS:{:.4f} LR:{:.8f}".format((epoch+1),
-                total_train_loss/(i+1), get_lr(args, optimizer)))
+            tr_loss += loss.item()
 
-            global_step += 1
+            # weights update
+            if ((i + 1) % accumulation_steps == 0) or (i + 1 == len(train_loader)):
+                if args['fp16']:
+                    torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), args['max_norm'])
+                else:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), args['max_norm'])
+                    
+                optimizer.step()
+                optimizer.zero_grad()
 
-            #save history metrics per save_steps
-            #for train loss visualitation
-            if global_step % args["save_history_steps"] == 0 :
-                print('save training loss history at global step: ', global_step)
-                step_train_loss = total_train_loss/(i+1)
-                step_train_loss_history.append(step_train_loss)
-                train_history_steps.append(global_step)
+                total_train_loss = total_train_loss + tr_loss
+                #revert tr_loss to zero
+                tr_loss = 0
+
+                # Calculate metrics
+                list_hyp += batch_hyp
+                list_label += batch_label
+                
+                train_pbar.set_description("(Epoch {}) TRAIN LOSS:{:.4f} LR:{:.8f}".format((epoch+1),
+                    total_train_loss/(i+1), get_lr(args, optimizer)))
+
+                global_step += 1
+
+                #save history metrics per save_steps
+                #for train loss visualitation
+                if global_step % args["save_history_steps"] == 0 :
+                    print('save training loss history at global step: ', global_step)
+                    step_train_loss = total_train_loss/(i+1)
+                    step_train_loss_history.append(step_train_loss)
+                    train_history_steps.append(global_step)
 
                         
         metrics = metrics_fn(list_hyp, list_label)
@@ -170,8 +216,10 @@ def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, 
                 # save model
                 if exp_id is not None:
                     torch.save(model.state_dict(), model_dir + "/best_model_" + str(exp_id) + ".th")
+                    save_best_pretrained_model(model,tokenizer,model_dir)
                 else:
                     torch.save(model.state_dict(), model_dir + "/best_model.th")
+                    save_best_pretrained_model(model,tokenizer,model_dir)
                 count_stop = 0
             else:
                 count_stop += 1
@@ -179,7 +227,7 @@ def train(model, train_loader, valid_loader, optimizer, forward_fn, metrics_fn, 
                 if count_stop == early_stop:
                     break
     
-    #training/validation per step
+    #training/validation per epoch
     plt.plot(train_loss_history)
     plt.plot(val_loss_history)
     plt.title('model loss')
@@ -273,7 +321,7 @@ if __name__ == "__main__":
 
     
     # Train
-    train(model, train_loader=train_loader, valid_loader=valid_loader, optimizer=optimizer, forward_fn=args['forward_fn'], metrics_fn=args['metrics_fn'], valid_criterion=args['valid_criterion'], i2w=i2w, n_epochs=args['n_epochs'], evaluate_every=1, early_stop=args['early_stop'], step_size=args['step_size'], gamma=args['gamma'], model_dir=model_dir, exp_id=0)
+    train(model, train_loader=train_loader, valid_loader=valid_loader, optimizer=optimizer, forward_fn=args['forward_fn'], metrics_fn=args['metrics_fn'], valid_criterion=args['valid_criterion'], i2w=i2w, n_epochs=args['n_epochs'], evaluate_every=1, early_stop=args['early_stop'], step_size=args['step_size'], gamma=args['gamma'], model_dir=model_dir, exp_id=0,tokenizer=tokenizer)
 
     # Save Meta
     if vocab_path:

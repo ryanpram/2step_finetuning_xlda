@@ -61,9 +61,12 @@ def forward_word_classification(model, batch_data, i2w, is_test=False, device='c
         token_type_batch = token_type_batch.cuda() if token_type_batch is not None else None
         subword_to_word_indices_batch = subword_to_word_indices_batch.cuda()
         label_batch = label_batch.cuda()
+        print('label batch size: ',label_batch.shape)
+        print('subword batch size: ',subword_batch.shape)
 
     # Forward model
     outputs = model(subword_batch, subword_to_word_indices_batch, attention_mask=mask_batch, token_type_ids=token_type_batch, labels=label_batch)
+ 
     loss, logits = outputs[:2]
     
     # generate prediction & label list
