@@ -1,16 +1,12 @@
 # Improving Low-Resource Question Answering with Cross-Lingual Data Augmentation Strategies
 
-This repo is forked form [technical-report](https://github.com/indobenchmark/indonlu) with several adjusment and addition. This repo is implementation of "Improving Low-Resource Question Answering with Cross-Lingual Data Augmentation Strategies" paper (still under review for one of international conference).
+This repo is forked form [indonlu-repo](https://github.com/indobenchmark/indonlu) with several adjusment and addition. This repo is implementation of "Improving Low-Resource Question Answering with Cross-Lingual Data Augmentation Strategies" paper (still under review for one of international conference).
 
 
 
 
 ### Requirement
-* Python 3.6
-* tensorboard 1.14.0
-* torch 1.7.0
-* sacremoses 0.0.45
-* boto3 1.17.99
+Check on [requirment_file](https://github.com/ryanpram/AwesomeMRC-QuACQA/blob/main/preprocessing-quac-notebook/preprocessing-quac.ipynb)
 
 ### Reproduce Step
 
