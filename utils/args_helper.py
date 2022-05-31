@@ -89,7 +89,7 @@ def get_eval_parser():
     return args
 
 #TODO: Need to change it into a json or something else that are easily extendable
-def append_dataset_args(args):    
+def append_dataset_args(args):      
     if args['dataset'] == "emotion-twitter":
         args['task'] = 'sequence_classification'
         args['num_labels'] = EmotionDetectionDataset.NUM_LABELS
@@ -319,6 +319,16 @@ def append_dataset_args(args):
             args['train_set_path'] = './dataset/facqa_qa-factoid-itb/newsqa/translated_final/newsqa_id_3022.csv'
             args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
             args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+        
+        # Code switching data augmentation 
+        elif args['data_type'] == 'combined-cs':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/newsqa/trainid-combined-facqa.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+        elif args['data_type'] == 'newsqa-cs-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/newsqa/trainid-v1.1.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
 
 
         # args['test_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
@@ -401,14 +411,7 @@ def append_dataset_args(args):
             args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_unfiltered_preprocess.csv'
             args['valid_set_path'] = './dataset/KorQuAD/valid_preprocessed.csv'
             args['test_set_path'] = './dataset/KorQuAD/test_preprocessed.csv'
-        elif args['data_type'] == 'indo-cs-combined':
-            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_unfiltered_preprocess.csv'
-            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
-            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
-        elif args['data_type'] == 'eng-id-cs-only':
-            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_unfiltered_preprocess.csv'
-            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
-            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+
 
 
         # args['test_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
