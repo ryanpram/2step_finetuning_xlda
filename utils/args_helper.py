@@ -61,6 +61,7 @@ def get_parser():
     parser.add_argument('--save_eval_history_steps', type=int, default=50, help="Save Eval history every X updates steps.")
     parser.add_argument('--dropout_prob', type=float, default=0.1, help="Dropout Probability value.")
     parser.add_argument('--data_type', type=str, default='original', help="For determine dataset.")
+    parser.add_argument('--model_type', type=str, default='xlm-roberta', help="For determine dataset.")
     parser.add_argument('--gradient_accumulation_steps', type=int, default=1, help="Number of updates steps to accumulate before performing a backward/update pass.")
 
     args = vars(parser.parse_args())
@@ -309,6 +310,16 @@ def append_dataset_args(args):
         elif args['data_type'] == 'test-indo':
             args['test_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
 
+        # Translated data augmentation 
+        elif args['data_type'] == 'combined-translated':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/combined_newsqa_translated_id.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+        elif args['data_type'] == 'newsqa-id-3022-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/newsqa/translated_final/newsqa_id_3022.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+
 
         # args['test_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
         args['vocab_path'] = "./dataset/facqa_qa-factoid-itb/vocab_uncased.txt"
@@ -390,6 +401,14 @@ def append_dataset_args(args):
             args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_unfiltered_preprocess.csv'
             args['valid_set_path'] = './dataset/KorQuAD/valid_preprocessed.csv'
             args['test_set_path'] = './dataset/KorQuAD/test_preprocessed.csv'
+        elif args['data_type'] == 'indo-cs-combined':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_unfiltered_preprocess.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
+        elif args['data_type'] == 'eng-id-cs-only':
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/eng_train_unfiltered_preprocess.csv'
+            args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
+            args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
 
 
         # args['test_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
