@@ -11,6 +11,7 @@ from tqdm import tqdm
 from transformers import AdamW
 from nltk.tokenize import TweetTokenizer
 import matplotlib.pyplot as plt
+from utils.args_helper import save_opts
 
 
 
@@ -287,6 +288,8 @@ if __name__ == "__main__":
     else:
         raise Exception(f'visualizatation directory `{visualization_dir}` already exists, use --force if you want to overwrite the folder')
 
+    #save args
+    save_opts(args,model_dir)
 
     # Set random seed
     set_seed(args['seed'])  # Added here for reproductibility    

@@ -17,6 +17,7 @@ from torch.utils.data import TensorDataset, DataLoader
 
 from nltk.tokenize import TweetTokenizer
 from argparse import ArgumentParser
+import json
 
 ###
 # args functions
@@ -31,7 +32,15 @@ def print_opts(opts):
         if opts[key]:
             print('{:>30}: {:<50}'.format(key, opts[key]).center(80))
     print('=' * 80)
-    
+
+def save_opts(opts,model_dir):
+    """save args to txt file
+    """
+    with open(model_dir + '/args.txt', 'w') as f:
+        json.dump(opts.__dict__, f, indent=2)
+    print("Args saved to ",model_dir + '/args.txt')
+    return True
+
 def get_parser():
     parser = ArgumentParser()
     parser.add_argument("--experiment_name", type=str, default="exp", help="Experiment name")
@@ -322,11 +331,11 @@ def append_dataset_args(args):
         
         # Code switching data augmentation 
         elif args['data_type'] == 'combined-cs':
-            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/newsqa/trainid-combined-facqa.csv'
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/newsqa/cs/trainid-combined-facqa.csv'
             args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
             args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
         elif args['data_type'] == 'newsqa-cs-only':
-            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/newsqa/trainid-v1.1.csv'
+            args['train_set_path'] = './dataset/facqa_qa-factoid-itb/newsqa/cs/trainid-v1.1.csv'
             args['valid_set_path'] = './dataset/facqa_qa-factoid-itb/valid_preprocess.csv'
             args['test_set_path'] = './dataset/facqa_qa-factoid-itb/test_preprocess_masked_label.csv'
 
