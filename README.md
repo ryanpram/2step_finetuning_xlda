@@ -1,6 +1,6 @@
 # Improving Low-Resource Question Answering with Cross-Lingual Data Augmentation Strategies
 
-This repo is forked form [indonlu-repo](https://github.com/indobenchmark/indonlu) with several adjusment and addition. This repo is implementation of "Improving Low-Resource Question Answering with Cross-Lingual Data Augmentation Strategies" paper (still under review in one of international conference).
+This repo is forked form [indonlu-repo](https://github.com/indobenchmark/indonlu) with several adjusment and addition. This repo is implementation of "Improving Low-Resource Question Answering with Cross-Lingual Data Augmentation Strategies" paper (accepted on ICOICT 2022) ([paper](https://ieeexplore.ieee.org/document/9914847)).
 
 
 
